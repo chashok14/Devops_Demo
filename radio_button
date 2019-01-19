@@ -1,0 +1,228 @@
+private class DemoChildFactory extends ChildFactory<Customer> {
+
+    @Override
+    protected boolean createKeys(List<Customer> list) {
+        list.add(new Customer());
+        list.add(new Customer());
+        list.add(new Customer());
+        return true;
+    }
+
+    @Override
+    protected Node createNodeForKey(Customer key) {
+        return new DemoNode(key);
+    }
+
+}
+
+public class DemoNode extends AbstractNode {
+
+    private DemoNode(Customer key) {
+        super(Children.LEAF, Lookups.singleton(key));
+        setDisplayName(key.getName());
+    }
+
+    @Override
+    protected Sheet createSheet() {
+        Sheet sheet = Sheet.createDefault();
+        Sheet.Set set = Sheet.createPropertiesSet();
+        Customer obj = getLookup().lookup(Customer.class);
+        CityProperty cityProperty = new CityProperty(obj);
+        set.put(cityProperty);
+        sheet.put(set);
+        return sheet;
+    }
+
+}
+
+public class CityProperty extends PropertySupport.ReadWrite<String> {
+
+    Customer c;
+
+    public CityProperty(Customer c) {
+        super("city", String.class, "City", "Name of City");
+        this.c = c;
+    }
+
+    public String getValue() throws IllegalAccessException, InvocationTargetException {
+        return c.getCity();
+    }
+
+    @Override
+    public PropertyEditor getPropertyEditor() {
+        return new CityPropertyEditorSupport(c);
+    }
+
+    public void setValue(String newValue) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        c.setCity(newValue);
+    }
+
+}
+
+private class CityPropertyEditorSupport extends PropertyEditorSupport implements ExPropertyEditor, InplaceEditor.Factory {
+
+    private final Customer c;
+
+    private CityPropertyEditorSupport(Customer c) {
+        this.c = c;
+    }
+
+    public String getAsText() {
+        String s = (String) getValue();
+        if (s == null) {
+            return "No City Set";
+        }
+        return s;
+    }
+
+    public void setAsText(String s) {
+        setValue(s);
+    }
+
+    public void attachEnv(PropertyEnv env) {
+        env.registerInplaceEditorFactory(this);
+    }
+
+    private InplaceEditor ed = null;
+
+    public InplaceEditor getInplaceEditor() {
+        if (ed == null) {
+            ed = new Inplace(c);
+        }
+        return ed;
+    }
+
+}
+
+public class Inplace implements InplaceEditor {
+
+    private final JComboBox comboBox = new JComboBox();
+    private PropertyEditor editor = null;
+    private final Customer c;
+
+    private Inplace(final Customer c) {
+        this.c = c;
+        comboBox.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                c.setCity(comboBox.getModel().getSelectedItem().toString());
+            }
+        });
+    }
+
+    public void connect(PropertyEditor propertyEditor, PropertyEnv env) {
+        editor = propertyEditor;
+        reset();
+    }
+
+    public JComponent getComponent() {
+        return comboBox;
+    }
+
+    public void clear() {
+        editor = null;
+        model = null;
+    }
+
+    public Object getValue() {
+        comboBox.repaint();
+        comboBox.updateUI();
+        ((JComponent) comboBox.getParent()).requestFocus();
+        updateUI();
+        repaint();
+        return comboBox.getSelectedItem();
+    }
+
+    public void setValue(Object object) {
+        comboBox.setSelectedItem(object);
+        comboBox.repaint();
+        comboBox.updateUI();
+        ((Customer) object).setCity(comboBox.getSelectedItem().toString());
+        ((JComponent) comboBox.getParent()).requestFocus();
+    }
+
+    public boolean supportsTextEntry() {
+        return true;
+    }
+
+    public void reset() {
+        comboBox.addItem("New York");
+        comboBox.addItem("London");
+        comboBox.addItem("Bergen");
+        comboBox.addItem("Larryville");
+        comboBox.addItem("Oslo");
+        String str = (String) editor.getValue();
+        if (str != null) {
+            comboBox.setSelectedItem(str);
+
+        }
+    }
+
+    public KeyStroke[] getKeyStrokes() {
+        return new KeyStroke[0];
+    }
+
+    public PropertyEditor getPropertyEditor() {
+        return editor;
+    }
+
+    public PropertyModel getPropertyModel() {
+        return model;
+    }
+    private PropertyModel model;
+
+    public void setPropertyModel(PropertyModel propertyModel) {
+        this.model = propertyModel;
+    }
+
+    public boolean isKnownComponent(Component component) {
+        return component == comboBox || comboBox.isAncestorOf(component);
+    }
+
+    public void addActionListener(ActionListener actionListener) {
+        //do nothing - not needed for this component
+    }
+
+    public void removeActionListener(ActionListener actionListener) {
+        //do nothing - not needed for this component
+    }
+
+}
+ 
+And here's the Customer object referred to in the code above:
+
+public class Customer {
+
+    private static int count = 0;
+    private final String name = "Person-" + count++;
+    private String city = "";
+    private PropertyChangeSupport propertyChangeSupport;
+
+    public Customer() {
+        count++;
+        propertyChangeSupport = new PropertyChangeSupport(this);
+    }
+
+    public void setCity(String d) {
+        String oldCity = city;
+        city = d;
+        propertyChangeSupport.firePropertyChange("city", oldCity, city);
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void addPropertyChangeListener(PropertyChangeListener listener) {
+        propertyChangeSupport.addPropertyChangeListener(listener);
+    }
+
+    public void removePropertyChangeListener(PropertyChangeListener listener) {
+        propertyChangeSupport.removePropertyChangeListener(listener);
+    }
+    
+}
